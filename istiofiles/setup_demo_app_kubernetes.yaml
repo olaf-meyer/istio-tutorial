@@ -1,0 +1,501 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: customer
+    namespace: demo-app
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: preference
+    namespace: demo-app
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: recommendationv1
+    namespace: demo-app
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: recommendationv2
+    namespace: demo-app
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: recommendationv3
+    namespace: demo-app
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: customer
+      version: v1
+    name: customer
+    namespace: demo-app
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: customer
+        version: v1
+    strategy:
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 1
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          prometheus.io/port: "8080"
+          prometheus.io/scheme: https
+          prometheus.io/scrape: "true"
+          sidecar.istio.io/inject: "true"
+          traffic.sidecar.istio.io/excludeOutboundPorts: "9092"
+        creationTimestamp: null
+        labels:
+          app: customer
+          version: v1
+      spec:
+        containers:
+        - env:
+          - name: JAVA_OPTIONS
+            value: -Xms15m -Xmx15m -Xmn15m
+          - name: KAFKA_BOOTSTRAP_SERVER
+            value: demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
+          - name: JAEGER_ENDPOINT
+            value: http://jaeger-collector.istio-system.svc:14268/api/traces
+          image: quay.io/omeyer/istio-tutorial-customer:v1.0-kafka
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          name: customer
+          ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          - containerPort: 8778
+            name: jolokia
+            protocol: TCP
+          - containerPort: 9779
+            name: prometheus
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccountName: customer
+        terminationGracePeriodSeconds: 30
+  status: null
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: preference
+      version: v1
+    name: preference-v1
+    namespace: demo-app
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: preference
+        version: v1
+    strategy:
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 1
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          prometheus.io/port: "8080"
+          prometheus.io/scheme: https
+          prometheus.io/scrape: "true"
+          sidecar.istio.io/inject: "true"
+        labels:
+          app: preference
+          version: v1
+      spec:
+        containers:
+        - env:
+          - name: JAVA_OPTIONS
+            value: -Xms15m -Xmx15m -Xmn15m
+          - name: KAFKA_BOOTSTRAP_SERVER
+            value: demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
+          - name: JAEGER_ENDPOINT
+            value: http://jaeger-collector.istio-system.svc:14268/api/traces
+          image: quay.io/omeyer/istio-tutorial-preference:v1.0-kafka
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          name: preference
+          ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          - containerPort: 8778
+            name: jolokia
+            protocol: TCP
+          - containerPort: 9779
+            name: prometheus
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccountName: preference
+        terminationGracePeriodSeconds: 30
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: recommendation
+      version: v1
+    name: recommendation-v1
+    namespace: demo-app
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: recommendation
+        version: v1
+    strategy:
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 1
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          prometheus.io/port: "8080"
+          prometheus.io/scheme: https
+          prometheus.io/scrape: "true"
+          sidecar.istio.io/inject: "true"
+        creationTimestamp: null
+        labels:
+          app: recommendation
+          version: v1
+      spec:
+        containers:
+        - env:
+          - name: JAEGER_ENDPOINT
+            value: http://jaeger-collector.istio-system.svc:14268/api/traces
+          - name: JAVA_OPTIONS
+            value: -Xms15m -Xmx15m -Xmn15m
+          image: quay.io/omeyer/istio-tutorial-recommendation:v1.0-kafka
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: recommendation
+          ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          - containerPort: 8778
+            name: jolokia
+            protocol: TCP
+          - containerPort: 9779
+            name: prometheus
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 5
+          resources: {}
+          securityContext:
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccountName: recommendationv1
+        terminationGracePeriodSeconds: 30
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: recommendation
+      version: v2
+    name: recommendation-v2
+    namespace: demo-app
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: recommendation
+        version: v2
+    strategy:
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 1
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          prometheus.io/port: "8080"
+          prometheus.io/scheme: https
+          prometheus.io/scrape: "true"
+          sidecar.istio.io/inject: "true"
+        creationTimestamp: null
+        labels:
+          app: recommendation
+          version: v2
+      spec:
+        containers:
+        - env:
+          - name: JAVA_OPTIONS
+            value: -Xms15m -Xmx15m -Xmn15m
+          image: quay.io/rhdevelopers/istio-tutorial-recommendation:v2.1
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 10
+          name: recommendation
+          ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          - containerPort: 8778
+            name: jolokia
+            protocol: TCP
+          - containerPort: 9779
+            name: prometheus
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 10
+          resources: {}
+          securityContext:
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccountName: recommendationv2
+        terminationGracePeriodSeconds: 30
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: recommendation
+      version: v3
+    name: recommendation-v3
+    namespace: demo-app
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: recommendation
+        version: v3
+    strategy:
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 1
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          prometheus.io/port: "8080"
+          prometheus.io/scheme: https
+          prometheus.io/scrape: "true"
+          sidecar.istio.io/inject: "true"
+        creationTimestamp: null
+        labels:
+          app: recommendation
+          version: v3
+      spec:
+        containers:
+        - env:
+          - name: JAVA_OPTIONS
+            value: -Xms15m -Xmx15m -Xmn15m
+          - name: JAEGER_ENDPOINT
+            value: http://jaeger-collector.istio-system.svc:14268/api/traces
+          image: quay.io/rhdevelopers/istio-tutorial-recommendation:v3.1
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 10
+          name: recommendation
+          ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          - containerPort: 8778
+            name: jolokia
+            protocol: TCP
+          - containerPort: 9779
+            name: prometheus
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 10
+          resources: {}
+          securityContext:
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccountName: recommendationv2
+        terminationGracePeriodSeconds: 30
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    labels:
+      app: customer
+    name: customer
+    namespace: demo-app
+  spec:
+    ports:
+    - name: http-customer
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app: customer
+    sessionAffinity: None
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    labels:
+      app: preference
+    name: preference
+    namespace: demo-app
+  spec:
+    ports:
+    - name: http-preferences
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app: preference
+    sessionAffinity: None
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    labels:
+      app: recommendation
+    name: recommendation
+    namespace: demo-app
+  spec:
+    ports:
+    - name: http-recommendation
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app: recommendation
+    sessionAffinity: None
+    type: ClusterIP
+kind: List
+metadata: {}

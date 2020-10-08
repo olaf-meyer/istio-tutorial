@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: setup_project
+parameters:
+objects:
+- apiVersion: project.openshift.io/v1
+  kind: Project
+  metadata:
+    annotations:
+      openshift.io/description: "Project for the Istio used only in customer microservices"
+      openshift.io/display-name: "Custom Istio"
+    name: istio-system
+  spec:
+  status:
+- apiVersion: project.openshift.io/v1
+  kind: Project
+  metadata:
+    annotations:
+      openshift.io/description: "Project for the customer microservices"
+      openshift.io/display-name: "Customer Microservices"
+    name: demo-app
+  spec:
+  status:
+- apiVersion: project.openshift.io/v1
+  kind: Project
+  metadata:
+    annotations:
+      openshift.io/description: "Project for the kafka"
+      openshift.io/display-name: "Kafka"
+    name: kafka
+  spec:
+  status:  

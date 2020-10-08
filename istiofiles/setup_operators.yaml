@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: setup_operators
+parameters:
+objects:
+- apiVersion: operators.coreos.com/v1alpha1
+  kind: Subscription
+  metadata:
+    name: jaeger-product
+    namespace: openshift-operators
+  spec:
+    channel: stable
+    installPlanApproval: Automatic
+    name: jaeger-product
+    source: redhat-operators
+    sourceNamespace: openshift-marketplace
+- apiVersion: operators.coreos.com/v1alpha1
+  kind: Subscription
+  metadata:
+    name: kiali-ossm
+    namespace: openshift-operators
+  spec:
+    channel: stable
+    installPlanApproval: Automatic
+    name: kiali-ossm
+    source: redhat-operators
+    sourceNamespace: openshift-marketplace
+- apiVersion: operators.coreos.com/v1alpha1
+  kind: Subscription
+  metadata:
+    name: servicemeshoperator
+    namespace: openshift-operators
+  spec:
+    channel: stable
+    installPlanApproval: Automatic
+    name: servicemeshoperator
+    source: redhat-operators
+    sourceNamespace: openshift-marketplace
+- apiVersion: operators.coreos.com/v1alpha1
+  kind: Subscription
+  metadata:
+    name: strimzi-kafka-operator
+    namespace: openshift-operators
+  spec:
+    channel: stable
+    installPlanApproval: Automatic
+    name: strimzi-kafka-operator
+    source: community-operators
+    sourceNamespace: openshift-marketplace

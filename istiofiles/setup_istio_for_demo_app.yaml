@@ -1,0 +1,291 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: config-for-demo-app
+parameters:
+- name: DEPLOYMENT_NAMESPACE
+  description: "Namespace to which the application will be deployed"
+  # value: olaf-customer
+  required: true
+- name: CONTROLPLANE_NAMESPACE
+  description: "Namespace of the istio control plane"
+  # value: olaf
+  required: true
+- name: CLUSTER_DOMAIN
+  description: "Domain of the OpenShift cluster"
+  required: true
+  # value: apps.poc2.int.consol.de
+# - name: KEYCLOAK_DOMAIN
+#   description: "Domain of the keycloak server in the OpenSHift cluster"
+#   value: skeycloak-olaf-sso.apps.poc2.int.consol.de
+objects:
+- apiVersion: networking.istio.io/v1alpha3
+  kind: Gateway
+  metadata:
+    name: customer-gateway
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    selector:
+      istio: ingressgateway # use istio default controller
+    servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+      - "customer-${DEPLOYMENT_NAMESPACE}.${CLUSTER_DOMAIN}"
+- apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: customer-gateway-vs
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    hosts:
+    - "customer-${DEPLOYMENT_NAMESPACE}.${CLUSTER_DOMAIN}"
+    gateways:
+    - customer-gateway
+    http:
+    - match:
+      - uri:
+          prefix: /customer
+      rewrite:
+        uri: /
+      route:
+      - destination:
+          host: customer
+          port:
+            number: 8080
+### Istio inter server routing
+- apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: customer
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    hosts:
+    - customer
+    http:
+    - route:
+      - destination:
+          host: customer
+          subset: version-v1
+        weight: 100
+- apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: preference
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    hosts:
+    - preference
+    http:
+    - route:
+      - destination:
+          host: preference
+          subset: version-v1
+        weight: 100
+- apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: recommendation
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    hosts:
+    - recommendation
+    http:
+    - route:
+      - destination:
+          host: recommendation
+          subset: version-v1
+        weight: 50
+      - destination:
+          host: recommendation
+          subset: version-v2
+        weight: 50
+      - destination:
+          host: recommendation
+          subset: version-v3
+        weight: 0
+- apiVersion: networking.istio.io/v1alpha3
+  kind: DestinationRule
+  metadata:
+    name: customer
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    host: customer
+    subsets:
+      - name: version-v1
+        labels:
+          version: v1
+    trafficPolicy:
+      tls:
+        mode: ISTIO_MUTUAL
+- apiVersion: networking.istio.io/v1alpha3
+  kind: DestinationRule
+  metadata:
+    name: preference
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    host: preference
+    subsets:
+      - name: version-v1
+        labels:
+          version: v1
+    trafficPolicy:
+      tls:
+        mode: ISTIO_MUTUAL
+- apiVersion: networking.istio.io/v1alpha3
+  kind: DestinationRule
+  metadata:
+    name: recommendation
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    host: recommendation
+    subsets:
+      - name: version-v1
+        labels:
+          version: v1
+      - name: version-v2
+        labels:
+          version: v2
+      - name: version-v3
+        labels:
+          version: v3
+    trafficPolicy:
+      tls:
+        mode: ISTIO_MUTUAL
+- apiVersion: networking.istio.io/v1alpha3
+  kind: ServiceEntry
+  metadata:
+    name: worldclockapi-egress-rule
+  spec:
+    hosts:
+    - worldclockapi.com
+    ports:
+    - name: http-80
+      number: 80
+      protocol: http
+### Istio Switch RBAC enforcement on
+# - apiVersion: "rbac.maistra.io/v1"
+#   kind: ServiceMeshRbacConfig
+#   metadata:
+#     name: default
+#     namespace: ${CONTROLPLANE_NAMESPACE}
+#   spec:
+#     mode: 'ON'
+### Istio RBAC service config unsing authorization policy instead of ServiceBinding for all services includes gateway
+- apiVersion: "security.istio.io/v1beta1"
+  kind: "AuthorizationPolicy"
+  metadata:
+    name: "ingress"
+    namespace: ${CONTROLPLANE_NAMESPACE}
+  spec:
+    selector:
+      matchLabels:
+        app: istio-ingressgateway
+    rules:
+    - to:
+      - operation:
+          methods: ["GET"]
+- apiVersion: "security.istio.io/v1beta1"
+  kind: "AuthorizationPolicy"
+  metadata:
+    name: "ingress-customer"
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    selector:
+      matchLabels:
+        app: customer
+    rules:
+      # - when:
+      #     - key: 'request.auth.claims[roles]'
+      #       values:
+      #         - customer
+      - to:
+          - operation:
+              methods:
+                - GET
+              # notPaths: ["/metrics"]
+- apiVersion: "security.istio.io/v1beta1"
+  kind: "AuthorizationPolicy"
+  metadata:
+    name: "preference"
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    selector:
+      matchLabels:
+        app: preference
+    rules:
+    - from:
+      - source:
+          principals: ["cluster.local/ns/${DEPLOYMENT_NAMESPACE}/sa/customer"]
+      to:
+      - operation:
+          methods: ["GET"]
+          # notPaths: ["/metrics"]
+- apiVersion: "security.istio.io/v1beta1"
+  kind: "AuthorizationPolicy"
+  metadata:
+    name: "recommendation"
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    selector:
+      matchLabels:
+        app: recommendation
+    rules:
+    - from:
+      - source:
+          principals: ["cluster.local/ns/${DEPLOYMENT_NAMESPACE}/sa/preference"]
+      to:
+      - operation:
+          methods: ["GET"]
+          # notPaths: ["/metrics"]
+- apiVersion: "security.istio.io/v1beta1"
+  kind: "AuthorizationPolicy"
+  metadata:
+    name: "scrape-metrics"
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    rules:
+    - from:
+      - source:
+          namespaces: ["${CONTROLPLANE_NAMESPACE}"]
+        to:
+        - operation:
+            methods: ["GET"]
+            paths: [/metrics]
+### Istio default mTLS rule switch on for ${CONTROLPLANE_NAMESPACE}, so that Kiali can monitor customer traffic(You can use istio configmap entry enableAutoMtls = true as well)
+# - apiVersion: "networking.istio.io/v1alpha3"
+#   kind: "DestinationRule"
+#   metadata:
+#     name: "default"
+#     namespace: ${CONTROLPLANE_NAMESPACE}
+#   spec:
+#     host: "*.local"
+#     trafficPolicy:
+#       tls:
+#         mode: ISTIO_MUTUAL
+### Istio (Ingress) Policy to enforce authorization via JWT and Keycloak
+# - apiVersion: authentication.istio.io/v1alpha1
+#   kind: Policy
+#   metadata:
+#     name: customerjwt
+#     namespace: ${DEPLOYMENT_NAMESPACE}
+#   spec:
+#     targets:
+#       - name: customer
+#       - name: preference
+#       - name: recommendation
+#     peers:
+#       - mtls: {}
+#     origins:
+#       - jwt:
+#           audiences:
+#             - customer
+#           issuer: 'https://${KEYCLOAK_DOMAIN}/auth/realms/customer'
+#           #jwks: {"keys":[{"kid":"WyXEwTpUURQsNanFbktq-KIHRM156vubC54uw3qio_0","kty":"RSA","alg":"RS256","use":"sig","n":"yQRHyWzFqXZ5DegUpf_9QA2kr5Ys2N6XXUhNdAHTh_CjQT-NQN3p5xyAfY6IdOlOevtueRdI0Jmj3C1Z_iGm_YfhvFKfQOYdbQH4pzLPSlBoOaADVqIgE55qrvoysft_KgAvUr2W7b4vWy13PKzBdcec6EDxxod3MmphT0K_9bit-KPMXEeLKlKfRVYAYEdM8FQJpUuO4HQv-xCP-KhYcR_YvipxhpthDkQqmZiAn6b4QffK-9brDlnhgCsQjP92GMPUU9AZ-G8UXE9W5B0cIblt9hogZDA8_jpXmOp2-tEqrd5T_HxfSYvQpSFDo3CY7rAvisR0ML6asB_RhUBQdQ","e":"AQAB"}]}
+#           jwksUri: 'https://${KEYCLOAK_DOMAIN}/auth/realms/customer/protocol/openid-connect/certs'
+#           triggerRules:
+#           - excludedPaths:
+#             - exact: /metrics
+#     principalBinding: USE_ORIGIN

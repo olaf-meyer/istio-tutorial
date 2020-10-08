@@ -5,19 +5,35 @@ import javax.json.Json;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 
+import javax.json.bind.JsonbBuilder;
+import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
+
+import com.redhat.developer.demos.recommendation.rest.RestServiceCall.Services;
+
 import org.jboss.logging.Logger;
+
+import org.eclipse.microprofile.reactive.messaging.Channel;
+import org.eclipse.microprofile.reactive.messaging.Emitter;
+
+import io.smallrye.reactive.messaging.kafka.KafkaRecord;
 
 @Path("/")
 public class RecommendationResource {
+    private static final String VERSION="v1";
 
-    private static final String RESPONSE_STRING_FORMAT = "recommendation v1 from '%s': %d\n";
+    private static final String RESPONSE_STRING_FORMAT = "recommendation "+VERSION+" from '%s': %d\n";
 
-    private static final String RESPONSE_STRING_NOW_FORMAT = "recommendation v3 %s from '%s': %d\n";
+    private static final String RESPONSE_STRING_NOW_FORMAT = "recommendation "+VERSION+" %s from '%s': %d\n";
 
     private final Logger logger = Logger.getLogger(getClass());
+
+
+    @Inject
+    @Channel("restServiceCall")
+    Emitter<String> restServiceCall;
 
     /**
      * Counter to help us see the lifecycle
@@ -37,6 +53,7 @@ public class RecommendationResource {
         count++;
         logger.info(String.format("recommendation request from %s: %d", HOSTNAME, count));
 
+        writeLogMessage(String.valueOf(count));
         // timeout();
 
         logger.debug("recommendation service ready to return");
@@ -82,6 +99,14 @@ public class RecommendationResource {
         final Response res = client.target("http://worldclockapi.com/api/json/cet/now").request().get();
         final String jsonObject = res.readEntity(String.class);
         return Json.createReader(new ByteArrayInputStream(jsonObject.getBytes())).readObject().getString("currentDateTime");
+    }
+
+    private void writeLogMessage(String comment) {
+        RestServiceCall serviceCall= new RestServiceCall(Services.RECOMMENDATION,null,VERSION,comment);
+        String out = JsonbBuilder.create().toJson(serviceCall);
+        logger.info("RestServiceCall"+ out);
+        KafkaRecord<Integer, String> msg = KafkaRecord.of(1, out);
+        restServiceCall.send(msg);
     }
 
 }
