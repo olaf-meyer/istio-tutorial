@@ -22,7 +22,7 @@ import io.smallrye.reactive.messaging.kafka.KafkaRecord;
 
 @Path("/")
 public class RecommendationResource {
-    private static final String VERSION="v1";
+    private static final String VERSION="v2";
 
     private static final String RESPONSE_STRING_FORMAT = "recommendation "+VERSION+" from '%s': %d\n";
 

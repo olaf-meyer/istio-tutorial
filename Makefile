@@ -10,8 +10,8 @@ build-preference:
 	docker push quay.io/omeyer/istio-tutorial-preference:v1.0-kafka
 build-recommendation:
 	mvn clean package -f recommendation/java/quarkus/ -DskipTests -Pnative -Dquarkus.native.container-build=true -Dquarkus.native.container-runtime=podman
-	docker build -t quay.io/omeyer/istio-tutorial-recommendation:v1.0-kafka -f recommendation/java/quarkus/src/main/docker/Dockerfile.native recommendation/java/quarkus/
-	docker push quay.io/omeyer/istio-tutorial-recommendation:v1.0-kafka
+	docker build -t quay.io/omeyer/istio-tutorial-recommendation:v2.0-kafka -f recommendation/java/quarkus/src/main/docker/Dockerfile.native recommendation/java/quarkus/
+	docker push quay.io/omeyer/istio-tutorial-recommendation:v2.0-kafka
 customer: build-customer show-images
 preference: build-preference show-images
 recommendation: build-recommendation show-images
