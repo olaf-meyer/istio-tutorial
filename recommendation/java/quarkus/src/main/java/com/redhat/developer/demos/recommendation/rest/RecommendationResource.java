@@ -22,7 +22,7 @@ import io.smallrye.reactive.messaging.kafka.KafkaRecord;
 
 @Path("/")
 public class RecommendationResource {
-    private static final String VERSION="v2";
+    private static final String VERSION="v3";
 
     private static final String RESPONSE_STRING_FORMAT = "recommendation "+VERSION+" from '%s': %d\n";
 
@@ -60,8 +60,8 @@ public class RecommendationResource {
         if (misbehave) {
             return doMisbehavior();
         }
-        return Response.ok(String.format(RESPONSE_STRING_FORMAT, HOSTNAME, count)).build();
-        // return Response.ok(String.format(RESPONSE_STRING_NOW_FORMAT, getNow(), HOSTNAME, count)).build();
+        // return Response.ok(String.format(RESPONSE_STRING_FORMAT, HOSTNAME, count)).build();
+        return Response.ok(String.format(RESPONSE_STRING_NOW_FORMAT, getNow(), HOSTNAME, count)).build();
     }
 
     private void timeout() {
