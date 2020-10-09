@@ -418,7 +418,8 @@ objects:
             value: -Xms15m -Xmx15m -Xmn15m
           - name: JAEGER_ENDPOINT
             value: 'http://jaeger-collector.${CONTROLPLANE_NAMESPACE}.svc:14268/api/traces'
-          image: quay.io/rhdevelopers/istio-tutorial-recommendation:v3.1          
+          #image: quay.io/rhdevelopers/istio-tutorial-recommendation:v3.1
+          image: quay.io/omeyer/istio-tutorial-recommendation:v3.0-kafka
           imagePullPolicy: Always
           livenessProbe:
             exec:
