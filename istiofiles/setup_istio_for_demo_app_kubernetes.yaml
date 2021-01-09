@@ -77,15 +77,15 @@ items:
       - destination:
           host: recommendation
           subset: version-v1
-        weight: 50
+        weight: 40
       - destination:
           host: recommendation
           subset: version-v2
-        weight: 50
+        weight: 40
       - destination:
           host: recommendation
           subset: version-v3
-        weight: 0
+        weight: 20
 - apiVersion: networking.istio.io/v1alpha3
   kind: DestinationRule
   metadata:
@@ -138,6 +138,7 @@ items:
   kind: ServiceEntry
   metadata:
     name: worldclockapi-egress-rule
+    namespace: demo-app
   spec:
     hosts:
     - worldclockapi.com
@@ -209,6 +210,31 @@ items:
     selector:
       matchLabels:
         app: recommendation
+- apiVersion: security.istio.io/v1beta1
+  kind: AuthorizationPolicy
+  metadata:
+    name: kafka-broker
+    namespace: kafka
+  spec:
+    rules:
+    - from:
+      - source:
+          principals:
+          - cluster.local/ns/demo-app/sa/consumer
+          - cluster.local/ns/demo-app/sa/customer
+          - cluster.local/ns/demo-app/sa/preference
+          - cluster.local/ns/demo-app/sa/recommendation
+    selector:
+      matchLabels:
+        app: kafka-cluster-demo-app-log
+- apiVersion: security.istio.io/v1beta1
+  kind: AuthorizationPolicy
+  metadata:
+    name: kafka-internal
+    namespace: kafka
+  spec:
+    rules:
+    - {}
 - apiVersion: security.istio.io/v1beta1
   kind: AuthorizationPolicy
   metadata:

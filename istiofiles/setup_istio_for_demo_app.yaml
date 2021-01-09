@@ -5,19 +5,16 @@ metadata:
 parameters:
 - name: DEPLOYMENT_NAMESPACE
   description: "Namespace to which the application will be deployed"
-  # value: olaf-customer
   required: true
 - name: CONTROLPLANE_NAMESPACE
   description: "Namespace of the istio control plane"
-  # value: olaf
   required: true
 - name: CLUSTER_DOMAIN
   description: "Domain of the OpenShift cluster"
   required: true
-  # value: apps.poc2.int.consol.de
-# - name: KEYCLOAK_DOMAIN
-#   description: "Domain of the keycloak server in the OpenSHift cluster"
-#   value: skeycloak-olaf-sso.apps.poc2.int.consol.de
+- name: KAFKA_NAMESPACE
+  description: "Namespace to which the kafka broker has be deployed"
+  required: true
 objects:
 - apiVersion: networking.istio.io/v1alpha3
   kind: Gateway
@@ -97,15 +94,49 @@ objects:
       - destination:
           host: recommendation
           subset: version-v1
-        weight: 50
+        weight: 40
       - destination:
           host: recommendation
           subset: version-v2
-        weight: 50
+        weight: 40
       - destination:
           host: recommendation
           subset: version-v3
-        weight: 0
+        weight: 20
+- apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: demo-app-log-cluster-kafka-brokers
+    namespace: ${KAFKA_NAMESPACE}
+  spec:
+    hosts:
+      - demo-app-log-cluster-kafka-brokers.kafka.svc.cluster.local
+    tcp:
+    - match:
+      - port: 9091
+      - port: 9092
+      - port: 9093
+      route:
+      - destination:
+          host: demo-app-log-cluster-kafka-brokers.kafka.svc.cluster.local
+          subset: 'version-v1'
+- apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: demo-app-log-cluster-kafka-bootstrap
+    namespace: ${KAFKA_NAMESPACE}
+  spec:
+    hosts:
+      - demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local
+    tcp:
+    - match:
+      - port: 9091
+      - port: 9092
+      - port: 9093
+      route:
+      - destination:
+          host: demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local
+          subset: 'version-v1'
 - apiVersion: networking.istio.io/v1alpha3
   kind: DestinationRule
   metadata:
@@ -155,9 +186,38 @@ objects:
       tls:
         mode: ISTIO_MUTUAL
 - apiVersion: networking.istio.io/v1alpha3
+  kind: DestinationRule
+  metadata:
+    name: demo-app-log-cluster-kafka-brokers
+    namespace: ${KAFKA_NAMESPACE}
+  spec:
+    host: demo-app-log-cluster-kafka-brokers.kafka.svc.cluster.local
+    subsets:
+      - labels:
+          version: '1'
+        name: 'version-v1'
+    trafficPolicy:
+      tls:
+        mode: ISTIO_MUTUAL
+- apiVersion: networking.istio.io/v1alpha3
+  kind: DestinationRule
+  metadata:
+    name: demo-app-log-cluster-kafka-bootstrap
+    namespace: ${KAFKA_NAMESPACE}
+  spec:
+    host: demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local
+    subsets:
+      - labels:
+          version: '1'
+        name: 'version-v1'
+    trafficPolicy:
+      tls:
+        mode: ISTIO_MUTUAL
+- apiVersion: networking.istio.io/v1alpha3
   kind: ServiceEntry
   metadata:
     name: worldclockapi-egress-rule
+    namespace: ${DEPLOYMENT_NAMESPACE}
   spec:
     hosts:
     - worldclockapi.com
@@ -165,14 +225,6 @@ objects:
     - name: http-80
       number: 80
       protocol: http
-### Istio Switch RBAC enforcement on
-# - apiVersion: "rbac.maistra.io/v1"
-#   kind: ServiceMeshRbacConfig
-#   metadata:
-#     name: default
-#     namespace: ${CONTROLPLANE_NAMESPACE}
-#   spec:
-#     mode: 'ON'
 ### Istio RBAC service config unsing authorization policy instead of ServiceBinding for all services includes gateway
 - apiVersion: "security.istio.io/v1beta1"
   kind: "AuthorizationPolicy"
@@ -205,7 +257,6 @@ objects:
           - operation:
               methods:
                 - GET
-              # notPaths: ["/metrics"]
 - apiVersion: "security.istio.io/v1beta1"
   kind: "AuthorizationPolicy"
   metadata:
@@ -222,7 +273,6 @@ objects:
       to:
       - operation:
           methods: ["GET"]
-          # notPaths: ["/metrics"]
 - apiVersion: "security.istio.io/v1beta1"
   kind: "AuthorizationPolicy"
   metadata:
@@ -239,7 +289,31 @@ objects:
       to:
       - operation:
           methods: ["GET"]
-          # notPaths: ["/metrics"]
+- apiVersion: security.istio.io/v1beta1
+  kind: AuthorizationPolicy
+  metadata:
+    name: kafka-broker
+    namespace: ${KAFKA_NAMESPACE}
+  spec:
+    rules:
+    - from:
+      - source:
+          principals:
+          - cluster.local/ns/demo-app/sa/consumer
+          - cluster.local/ns/demo-app/sa/customer
+          - cluster.local/ns/demo-app/sa/preference
+          - cluster.local/ns/demo-app/sa/recommendation
+    selector:
+      matchLabels:
+        app: kafka-cluster-demo-app-log
+- apiVersion: security.istio.io/v1beta1
+  kind: AuthorizationPolicy
+  metadata:
+    name: kafka-internal
+    namespace: ${KAFKA_NAMESPACE}
+  spec:
+    rules:
+    - {}
 - apiVersion: "security.istio.io/v1beta1"
   kind: "AuthorizationPolicy"
   metadata:
@@ -254,38 +328,19 @@ objects:
         - operation:
             methods: ["GET"]
             paths: [/metrics]
-### Istio default mTLS rule switch on for ${CONTROLPLANE_NAMESPACE}, so that Kiali can monitor customer traffic(You can use istio configmap entry enableAutoMtls = true as well)
-# - apiVersion: "networking.istio.io/v1alpha3"
-#   kind: "DestinationRule"
+# - kind: PeerAuthentication
+#   apiVersion: security.istio.io/v1beta1
 #   metadata:
-#     name: "default"
-#     namespace: ${CONTROLPLANE_NAMESPACE}
-#   spec:
-#     host: "*.local"
-#     trafficPolicy:
-#       tls:
-#         mode: ISTIO_MUTUAL
-### Istio (Ingress) Policy to enforce authorization via JWT and Keycloak
-# - apiVersion: authentication.istio.io/v1alpha1
-#   kind: Policy
-#   metadata:
-#     name: customerjwt
+#     name: demo-app
 #     namespace: ${DEPLOYMENT_NAMESPACE}
 #   spec:
-#     targets:
-#       - name: customer
-#       - name: preference
-#       - name: recommendation
-#     peers:
-#       - mtls: {}
-#     origins:
-#       - jwt:
-#           audiences:
-#             - customer
-#           issuer: 'https://${KEYCLOAK_DOMAIN}/auth/realms/customer'
-#           #jwks: {"keys":[{"kid":"WyXEwTpUURQsNanFbktq-KIHRM156vubC54uw3qio_0","kty":"RSA","alg":"RS256","use":"sig","n":"yQRHyWzFqXZ5DegUpf_9QA2kr5Ys2N6XXUhNdAHTh_CjQT-NQN3p5xyAfY6IdOlOevtueRdI0Jmj3C1Z_iGm_YfhvFKfQOYdbQH4pzLPSlBoOaADVqIgE55qrvoysft_KgAvUr2W7b4vWy13PKzBdcec6EDxxod3MmphT0K_9bit-KPMXEeLKlKfRVYAYEdM8FQJpUuO4HQv-xCP-KhYcR_YvipxhpthDkQqmZiAn6b4QffK-9brDlnhgCsQjP92GMPUU9AZ-G8UXE9W5B0cIblt9hogZDA8_jpXmOp2-tEqrd5T_HxfSYvQpSFDo3CY7rAvisR0ML6asB_RhUBQdQ","e":"AQAB"}]}
-#           jwksUri: 'https://${KEYCLOAK_DOMAIN}/auth/realms/customer/protocol/openid-connect/certs'
-#           triggerRules:
-#           - excludedPaths:
-#             - exact: /metrics
-#     principalBinding: USE_ORIGIN
+#     mtls:
+#       mode: STRICT
+# - kind: PeerAuthentication
+#   apiVersion: security.istio.io/v1beta1
+#   metadata:
+#     name: kafka
+#     namespace: ${KAFKA_NAMESPACE}
+#   spec:
+#     mtls:
+#       mode: STRICT
