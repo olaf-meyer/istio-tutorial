@@ -38,6 +38,11 @@ objects:
   metadata:
     name: recommendationv3
     namespace: ${DEPLOYMENT_NAMESPACE}
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: consumer
+    namespace: ${DEPLOYMENT_NAMESPACE}
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
@@ -66,7 +71,7 @@ objects:
           prometheus.io/scheme: https
           prometheus.io/scrape: "true"
           sidecar.istio.io/inject: "true"
-          traffic.sidecar.istio.io/excludeOutboundPorts: '9092'
+          #traffic.sidecar.istio.io/excludeOutboundPorts: '9092'
         creationTimestamp: null
         labels:
           app: customer
@@ -81,7 +86,11 @@ objects:
               demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
           - name: JAEGER_ENDPOINT
             value: 'http://jaeger-collector.${CONTROLPLANE_NAMESPACE}.svc:14268/api/traces'
-          #image: quay.io/rhdevelopers/istio-tutorial-customer:v1.1
+          - name: KAFKA_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: customer-writer
+                key: password
           image: quay.io/omeyer/istio-tutorial-customer:v1.0-kafka
           imagePullPolicy: Always
           livenessProbe:
@@ -168,7 +177,11 @@ objects:
               demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
           - name: JAEGER_ENDPOINT
             value: 'http://jaeger-collector.${CONTROLPLANE_NAMESPACE}.svc:14268/api/traces'
-          #image: quay.io/rhdevelopers/istio-tutorial-preference:v1.1
+          - name: KAFKA_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: preference-writer
+                key: password
           image: quay.io/omeyer/istio-tutorial-preference:v1.0-kafka
           imagePullPolicy: Always
           livenessProbe:
@@ -250,9 +263,15 @@ objects:
         - env:
           - name: JAEGER_ENDPOINT
             value: 'http://jaeger-collector.${CONTROLPLANE_NAMESPACE}.svc:14268/api/traces'
+          - name: KAFKA_BOOTSTRAP_SERVER
+            value: demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
           - name: JAVA_OPTIONS
             value: -Xms15m -Xmx15m -Xmn15m
-          #image: quay.io/rhdevelopers/istio-tutorial-recommendation:v1.1
+          - name: KAFKA_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: recommendation-writer
+                key: password
           image: quay.io/omeyer/istio-tutorial-recommendation:v1.0-kafka
           imagePullPolicy: Always
           livenessProbe:
@@ -334,7 +353,16 @@ objects:
         - env:
           - name: JAVA_OPTIONS
             value: -Xms15m -Xmx15m -Xmn15m
-          image: quay.io/rhdevelopers/istio-tutorial-recommendation:v2.1
+          - name: JAEGER_ENDPOINT
+            value: http://jaeger-collector.istio-system.svc:14268/api/traces
+          - name: KAFKA_BOOTSTRAP_SERVER
+            value: demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
+          - name: KAFKA_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: recommendation-writer
+                key: password
+          image: quay.io/omeyer/istio-tutorial-recommendation:v2.0-kafka
           imagePullPolicy: Always
           livenessProbe:
             exec:
@@ -417,7 +445,14 @@ objects:
             value: -Xms15m -Xmx15m -Xmn15m
           - name: JAEGER_ENDPOINT
             value: 'http://jaeger-collector.${CONTROLPLANE_NAMESPACE}.svc:14268/api/traces'
-          image: quay.io/rhdevelopers/istio-tutorial-recommendation:v3.1          
+          - name: KAFKA_BOOTSTRAP_SERVER
+            value: demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
+          - name: KAFKA_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: recommendation-writer
+                key: password
+          image: quay.io/omeyer/istio-tutorial-recommendation:v3.0-kafka
           imagePullPolicy: Always
           livenessProbe:
             exec:
@@ -461,6 +496,99 @@ objects:
         serviceAccountName: recommendationv2
         securityContext: {}
         terminationGracePeriodSeconds: 30
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: consumer
+      version: v1
+    name: consumer
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: consumer
+        version: v1
+    strategy:
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 1
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          prometheus.io/port: "8080"
+          prometheus.io/scheme: https
+          prometheus.io/scrape: "true"
+          sidecar.istio.io/inject: "true"
+          #traffic.sidecar.istio.io/excludeOutboundPorts: '9092'
+        creationTimestamp: null
+        labels:
+          app: consumer
+          version: v1
+      spec:
+        containers:
+        - env:      
+          - name: JAVA_OPTIONS
+            value: -Xms15m -Xmx15m -Xmn15m
+          - name: KAFKA_BOOTSTRAP_SERVER
+            value: >-
+              demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
+          - name: JAEGER_ENDPOINT
+            value: 'http://jaeger-collector.${CONTROLPLANE_NAMESPACE}.svc:14268/api/traces'
+          - name: KAFKA_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: consumer-reader-writer
+                key: password
+          image: quay.io/omeyer/istio-tutorial-consumer:v1.0-kafka
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          name: consumer
+          ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          - containerPort: 8778
+            name: jolokia
+            protocol: TCP
+          - containerPort: 9779
+            name: prometheus
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - curl
+              - 127.0.0.1:8080/health
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccountName: consumer
+        terminationGracePeriodSeconds: 30
+  status:
 - apiVersion: v1
   kind: Service
   metadata:
@@ -513,6 +641,24 @@ objects:
       targetPort: 8080
     selector:
       app: recommendation
+    sessionAffinity: None
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    labels:
+      app: consumer
+    name: consumer
+    namespace: ${DEPLOYMENT_NAMESPACE}
+  spec:
+    ports:
+    - name: http-consumer
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app: consumer
     sessionAffinity: None
     type: ClusterIP
 # - kind: Route
