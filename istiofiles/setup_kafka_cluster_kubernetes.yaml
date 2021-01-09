@@ -20,16 +20,15 @@ items:
       storage:
         type: ephemeral
       replicas: 1
-      # listeners:
-      #   plain:
-      #     authentication:
-      #       type: scram-sha-512
-      #   tls:
-      #     authentication:
-      #       type: tls
       listeners:
-        plain: {}
-        tls: {}
+        plain:
+          authentication:
+            type: scram-sha-512
+      # listeners:
+      #   plain: {}
+      #   tls: {}
+      authorization:
+        type: simple
       template:
         statefulset:
           metadata:
@@ -119,3 +118,211 @@ items:
       segment.bytes: 1073741824
     partitions: 10
     replicas: 1
+- apiVersion: kafka.strimzi.io/v1beta1
+  kind: KafkaTopic
+  metadata:
+    name: demo-application-log-aggregated
+    labels:
+      strimzi.io/cluster: demo-app-log-cluster
+    namespace: kafka
+  spec:
+    config:
+      retention.ms: 604800000
+      segment.bytes: 1073741824
+    partitions: 10
+    replicas: 1
+- apiVersion: kafka.strimzi.io/v1beta1
+  kind: KafkaUser
+  metadata:
+    name: customer-writer
+    labels:
+      strimzi.io/cluster: demo-app-log-cluster
+    namespace: kafka
+  spec:
+    authentication:
+      type: scram-sha-512
+    authorization:
+      type: simple
+      acls:
+        # Example Producer Acls for topic demo-application-log-customer
+        - resource:
+            type: topic
+            name: demo-application-log-customer
+            patternType: literal
+          operation: Write
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-customer
+            patternType: literal
+          operation: Create
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-customer
+            patternType: literal
+          operation: Describe
+          host: "*"
+- apiVersion: kafka.strimzi.io/v1beta1
+  kind: KafkaUser
+  metadata:
+    name: preference-writer
+    labels:
+      strimzi.io/cluster: demo-app-log-cluster
+    namespace: kafka
+  spec:
+    authentication:
+      type: scram-sha-512
+    authorization:
+      type: simple
+      acls:
+        # Example Producer Acls for topic demo-application-log-preference
+        - resource:
+            type: topic
+            name: demo-application-log-preference
+            patternType: literal
+          operation: Write
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-preference
+            patternType: literal
+          operation: Create
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-preference
+            patternType: literal
+          operation: Describe
+          host: "*"
+- apiVersion: kafka.strimzi.io/v1beta1
+  kind: KafkaUser
+  metadata:
+    name: recommendation-writer
+    labels:
+      strimzi.io/cluster: demo-app-log-cluster
+    namespace: kafka
+  spec:
+    authentication:
+      type: scram-sha-512
+    authorization:
+      type: simple
+      acls:
+        # Example Producer Acls for topic demo-application-log-recommendation
+        - resource:
+            type: topic
+            name: demo-application-log-recommendation
+            patternType: literal
+          operation: Write
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-recommendation
+            patternType: literal
+          operation: Create
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-recommendation
+            patternType: literal
+          operation: Describe
+          host: "*"
+- apiVersion: kafka.strimzi.io/v1beta1
+  kind: KafkaUser
+  metadata:
+    name: consumer-reader-writer
+    labels:
+      strimzi.io/cluster: demo-app-log-cluster
+    namespace: kafka
+  spec:
+    authentication:
+      type: scram-sha-512
+    authorization:
+      type: simple
+      acls:
+        # Example consumer Acls for topic my-topic using consumer group my-group
+        - resource:
+            type: topic
+            name: demo-application-log-customer
+            patternType: literal
+          operation: Read
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-customer
+            patternType: literal
+          operation: Describe
+          host: "*"
+        - resource:
+            type: group
+            name: demo-application-log-customer
+            patternType: literal
+          operation: Read
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-preference
+            patternType: literal
+          operation: Read
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-preference
+            patternType: literal
+          operation: Describe
+          host: "*"
+        - resource:
+            type: group
+            name: demo-application-log-preference
+            patternType: literal
+          operation: Read
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-recommendation
+            patternType: literal
+          operation: Read
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-recommendation
+            patternType: literal
+          operation: Describe
+          host: "*"
+        - resource:
+            type: group
+            name: demo-application-log-recommendation
+            patternType: literal
+          operation: Read
+          host: "*"
+        - resource:
+            type: group
+            name: demo-application-log-consumer
+            patternType: literal
+          operation: Read
+          host: "*"
+        # Example Producer Acls for topic demo-application-log-aggregated
+        - resource:
+            type: topic
+            name: demo-application-log-aggregated
+            patternType: literal
+          operation: Write
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-aggregated
+            patternType: literal
+          operation: Create
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-aggregated
+            patternType: literal
+          operation: Describe
+          host: "*"
+        - resource:
+            type: topic
+            name: demo-application-log-consumer
+            patternType: prefix
+          operation: All
+          host: "*"
