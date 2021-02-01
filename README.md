@@ -1,6 +1,6 @@
-# TODO änderungen von den kubernetes deployments nach openshift templates nachziehen!!
-
 # Setup demo application to log calls to a Kafka topic
+
+## Setup demo application in OpenShift
 
 1. Install operators. After executing the command, wait some time till the operators are
 
@@ -56,7 +56,7 @@
     ./scripts/run_demo_application_gateway.sh
     ```
 
-## How to deployment demo app in Kubernetes
+## Setup demo application in Kubernetes
 
 1. Create namespaces
 
@@ -66,7 +66,7 @@
     kubectl create namespace kafka
     ```
 
-# How to install Istio:
+### How to install Istio
 
 Download Istio with this command:
 
@@ -97,15 +97,6 @@ $ istioctl install --set profile=demo
 ✔ Installation complete
 ```
 
-Add a namespace label to instruct Istio to automatically inject Envoy sidecar proxies when you deploy your application later:
-
-``` bash
-$ kubectl label namespace kafka istio-injection=enabled
-namespace/kafka labeled
-$ kubectl label namespace demo-app istio-injection=enabled
-namespace/demo-app labeled
-```
-
 ``` bash
 kubectl apply -f samples/addons
 ```
@@ -114,6 +105,8 @@ Ignore the error message `unable to recognize "samples/addons/kiali.yaml": no ma
 
 More details can be found here: [Getting started with Istio](https://istio.io/latest/docs/setup/getting-started/)
 All available options for the installation are described on this web site: [Istio Installation guides](https://istio.io/latest/docs/setup/install/)
+
+### Setup the application
 
 1. Setup demo app in namespace demo app
 
@@ -131,6 +124,12 @@ All available options for the installation are described on this web site: [Isti
 
     ``` bash
     kubectl create -f istiofiles/setup_kafka_cluster_kubernetes.yaml
+    ```
+
+1. Copy secrets from namespace kafka to namespace demo-app
+
+    ``` bash
+    kubectl get secret --namespace kafka -l strimzi.io/cluster=demo-app-log-cluster,strimzi.io/kind=KafkaUser -o json | sed 's/"namespace"\:\s*"kafka"/"namespace": "demo-app"/g'|jq 'del(.items[].metadata.ownerReferences)'|kubectl apply -f - -n demo-app
     ```
 
 1. Enable auto injection in namespace demo-app
@@ -157,8 +156,6 @@ All available options for the installation are described on this web site: [Isti
     neverInjectSelector:
       - matchExpressions:
         - {key: strimzi.io/kind, operator: In, values: [cluster-operator]}
-      - matchExpressions:
-        - {key: app-type, operator: In, values: [entity-operator]}
     ```
 
     Delete istiod pod to reload settings
@@ -180,30 +177,7 @@ All available options for the installation are described on this web site: [Isti
     ```
 
 1. Setup istio config for demo application
-ToDo Update istio seeting
+
     ``` bash
     kubectl create -f istiofiles/setup_istio_for_demo_app_kubernetes.yaml
     ```
-
-## TODO Add environment variable to setup tp kafka cluster
-
-kubectl run kafdrop --port=9000 --env="KAFKA_BROKERCONNECT=demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092" --image=obsidiandynamics/kafdrop -n kafka
-
-
-Peer stuff is missing
-
-kubectl get secret --namespace kafka -l strimzi.io/cluster=demo-app-log-cluster,strimzi.io/kind=KafkaUser -o json | sed 's/"namespace"\:\s*"kafka"/"namespace": "demo-app"/g'|jq 'del(.items[].metadata.ownerReferences)'|kubectl apply -f - -n demo-app
-
-
-In configmap istio-system/istio-sidecar-injector change value for key .Values.global.proxy.privileged to true to allow execution of sudo command.
-
-
-Verify ssl handshare via tcp dump
-sudo tcpdump -ni eth0 "tcp port 9092 and (tcp[((tcp[12] & 0xf0) >> 2)] = 0x16)"
-Source https://stackoverflow.com/questions/39624745/capture-only-ssl-handshake-with-tcpdump
-or 
-openssl s_client -showcerts -servername -connect demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092 </dev/null
-
-Prüfen ob man parameter -servername wirklick braucht?
-
-Beim Artikel Links zu Quarkus Seite für Kafka angeben!
