@@ -87,6 +87,40 @@ items:
           subset: version-v3
         weight: 20
 - apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: demo-app-log-cluster-kafka-brokers
+    namespace: kafka
+  spec:
+    hosts:
+      - demo-app-log-cluster-kafka-brokers.kafka.svc.cluster.local
+    tcp:
+    - match:
+      - port: 9091
+      - port: 9092
+      - port: 9093
+      route:
+      - destination:
+          host: demo-app-log-cluster-kafka-brokers.kafka.svc.cluster.local
+          subset: 'version-v1'
+- apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: demo-app-log-cluster-kafka-bootstrap
+    namespace: kafka
+  spec:
+    hosts:
+      - demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local
+    tcp:
+    - match:
+      - port: 9091
+      - port: 9092
+      - port: 9093
+      route:
+      - destination:
+          host: demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local
+          subset: 'version-v1'
+- apiVersion: networking.istio.io/v1alpha3
   kind: DestinationRule
   metadata:
     name: customer
@@ -131,6 +165,34 @@ items:
     - labels:
         version: v3
       name: version-v3
+    trafficPolicy:
+      tls:
+        mode: ISTIO_MUTUAL
+- apiVersion: networking.istio.io/v1alpha3
+  kind: DestinationRule
+  metadata:
+    name: demo-app-log-cluster-kafka-brokers
+    namespace: kafka
+  spec:
+    host: demo-app-log-cluster-kafka-brokers.kafka.svc.cluster.local
+    subsets:
+      - labels:
+          version: '1'
+        name: 'version-v1'
+    trafficPolicy:
+      tls:
+        mode: ISTIO_MUTUAL
+- apiVersion: networking.istio.io/v1alpha3
+  kind: DestinationRule
+  metadata:
+    name: demo-app-log-cluster-kafka-bootstrap
+    namespace: kafka
+  spec:
+    host: demo-app-log-cluster-kafka-bootstrap.kafka.svc.cluster.local
+    subsets:
+      - labels:
+          version: '1'
+        name: 'version-v1'
     trafficPolicy:
       tls:
         mode: ISTIO_MUTUAL
@@ -252,5 +314,21 @@ items:
           - GET
           paths:
           - /metrics
+- kind: PeerAuthentication
+  apiVersion: security.istio.io/v1beta1
+  metadata:
+    name: demo-app
+    namespace: demo-app
+  spec:
+    mtls:
+      mode: STRICT
+- kind: PeerAuthentication
+  apiVersion: security.istio.io/v1beta1
+  metadata:
+    name: kafka
+    namespace: kafka
+  spec:
+    mtls:
+      mode: STRICT
 kind: List
 metadata: {}

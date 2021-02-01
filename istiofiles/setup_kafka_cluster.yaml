@@ -64,6 +64,8 @@ objects:
               app: kafka-entity-operator-demo-app-log
               version: 1.0
               app-type: entity-operator
+            annotations:
+              sidecar.istio.io/inject: "true"
     zookeeper:
       storage:
         type: ephemeral
