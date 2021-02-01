@@ -26,4 +26,4 @@ customer → preference → recommendation
 
 = Extended demo application with Kafka integration
 
-If you want to install the extended demo application with the Kafka integration the how-to documentation is link:README.md[here]. I created a branch for each version of the recommendation. To build the demo application run the command `make all`. In order to build each version of the recommendation, you need to check out each of the òlaf-meyer-kafka-recommendation-v*` branches and run `make recommendation`.
+If you want to install the extended demo application with the Kafka integration the how-to documentation is link:README.md[here]. I created a branch for each version of the recommendation. To build the demo application run the command `make all`. In order to build each version of the recommendation, you need to check out each of the `olaf-meyer-kafka-recommendation-v*` branches and run `make recommendation`.
