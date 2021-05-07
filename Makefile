@@ -5,7 +5,7 @@ build-customer:
 	docker build -t quay.io/omeyer/istio-tutorial-customer:v1.0-kafka -f customer/java/quarkus/src/main/docker/Dockerfile.native customer/java/quarkus/
 	docker push quay.io/omeyer/istio-tutorial-customer:v1.0-kafka
 build-preference:
-	mvn clean package -f preference/java/quarkus/ -DskipTests -Pnative -Dquarkus.native.container-build=true -Dquarkus.native.container-runtime=podman
+	mvn clean package -f preference/java/quarkus/ -DskipTests -Pnative -Dquarkus.native.container-build=true -Dquarkus.native.container-runtime=podman  -Dquarkus.native.additional-build-args=-H:ReflectionConfigurationFiles=reflection-config.json
 	docker build -t quay.io/omeyer/istio-tutorial-preference:v1.0-kafka -f preference/java/quarkus/src/main/docker/Dockerfile.native preference/java/quarkus/
 	docker push quay.io/omeyer/istio-tutorial-preference:v1.0-kafka
 build-recommendation:
