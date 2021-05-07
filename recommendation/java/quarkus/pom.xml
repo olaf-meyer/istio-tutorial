@@ -70,6 +70,11 @@
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-resteasy-jsonb</artifactId>
     </dependency>
+    <dependency>
+        <groupId>io.opentracing.contrib</groupId>
+        <artifactId>opentracing-kafka-client</artifactId>
+        <version>0.1.15</version>
+    </dependency>
   </dependencies>
  <build>
     <plugins>
