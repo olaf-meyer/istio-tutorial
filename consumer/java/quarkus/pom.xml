@@ -64,6 +64,11 @@
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-smallrye-metrics</artifactId>
     </dependency>
+    <dependency>
+        <groupId>io.opentracing.contrib</groupId>
+        <artifactId>opentracing-kafka-streams</artifactId>
+        <version>0.1.15</version>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
